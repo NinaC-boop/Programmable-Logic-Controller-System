@@ -257,30 +257,11 @@ void Galil::DigitalBitOutput(bool val, uint8_t bit) {
 // Query the digital inputs of the GALIL, See Galil command library @IN
 // Stores two errors in two lines in ReadBuffer.
 uint16_t Galil::DigitalInput() {
-
-
-    char buf[1024];
-    char Command[128] = "";
-    char error[1024];
-
     uint16_t data = 0;
-    sprintf_s(Command, "MG @IN[1];");
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
 
-    strcpy_s(error, ReadBuffer);
-
-    data = atoi(Command);
-    data <<= 8;
-    sprintf_s(Command, "MG @IN[0];");
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
-
-    strcat_s(error, ReadBuffer);
-    strcpy_s(ReadBuffer, error);
-
-    data &= atoi(Command);
-    printf("Digital input: %d\n", int(data));
+    data |= this->DigitalByteInput(0);
+    data |= (this->DigitalByteInput(1) << 8);
+    printf("Digital input: %d\n", data);
 
 
     return data;
@@ -291,7 +272,6 @@ uint16_t Galil::DigitalInput() {
 uint8_t Galil::DigitalByteInput(bool bank) {
     uint8_t data = 0;
     uint8_t set = 0;
-    char buf[1024];
     char Command[128] = "";
 
     if (bank) {
@@ -304,7 +284,9 @@ uint8_t Galil::DigitalByteInput(bool bank) {
     else {
         for (int i = 0; i < 8; i++) {
             set = this->DigitalBitInput(i);
+
             data |= (set << i);
+            //printf("=%d|", data);
         }
     }
 
@@ -317,22 +299,24 @@ uint8_t Galil::DigitalByteInput(bool bank) {
 bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digital inputs. Above functions may use this function
     char buf[1024];
     char Command[128] = "";
+    bool data;
 
     if (bit < 8) {
         sprintf_s(Command, "MG @IN[%d];", bit);
-        printf("%s\n", Command);
+        //        printf("%s\n", Command);
         storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        data = atoi(buf);
+        data = 1 ^ data;
     }
     else {
         sprintf_s(Command, "MG @OUT[%d];", bit);
-        printf("%s\n", Command);
+        //        printf("%s\n", Command);
         storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        data = atoi(buf);
     }
 
+    //    printf("|%d|", data);
 
-    bool data = atoi(buf);
-
-    printf("Bit read: %d: %d\n", bit, data);
     return data;
 }
 
@@ -470,35 +454,27 @@ int main(void) {
 
     uint16_t value = 666;
     asd.DigitalOutput(value);
-    Sleep(500);
 
     asd.DigitalByteOutput(1, 22);
-    Sleep(500);
     asd.DigitalByteOutput(0, 103);
-    Sleep(500);
 
     // blink 7
     asd.DigitalBitOutput(0, 0);
-    Sleep(500);
     asd.DigitalBitOutput(1, 0);
-    Sleep(500);
     asd.DigitalBitOutput(0, 0);
-    Sleep(500);
     asd.DigitalBitOutput(1, 0);
-    Sleep(500);
 
 
 
 
 
-
+    value = 666;
+    asd.DigitalOutput(value); // 154, 2
 
 
 
     asd.DigitalInput();
-    printf("Bank 0 bytes: \n");
     asd.DigitalByteInput(0);
-    printf("Bank 1 bytes: \n");
     asd.DigitalByteInput(1);
     asd.DigitalBitInput(1);
 
