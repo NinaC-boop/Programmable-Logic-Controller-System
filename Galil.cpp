@@ -11,7 +11,6 @@
 #include <thread>
 
 
-
 #include <stdlib.h>
 #include "gclib.h"
 #include "gclibo.h"
@@ -31,96 +30,100 @@ using namespace std::chrono_literals;
 GCon g = 0;
 
 
+/*
+* #########################      HELPER FUNCTIONS      ##############################
+*/
+
 // Stores error according to GReturn code and ReadBuffer from given command
-void storeError(GReturn rc, char *buf)
+void storeError(GReturn rc, char(&buf)[1024])
 {
+
     switch (rc) {
-        case G_NO_ERROR: //!< Return value if function succeeded.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_NO_ERROR_S);
-            break;
-        case G_GCLIB_ERROR: //!< General library error. Indicates internal API caught an unexpected error. Contact Galil support if this error is returned, softwaresupport@galil.com.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCLIB_ERROR_S);
-            break;
-        case G_GCLIB_UTILITY_ERROR: //!< An invalid request value was specified to GUtility.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCLIB_UTILITY_ERROR_S);
-            break;
-        case G_GCLIB_UTILITY_IP_TAKEN: //!< The IP cannot be assigned because ping returned a reply.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCLIB_UTILITY_IP_TAKEN_S);
-            break;
-        case G_GCLIB_NON_BLOCKING_READ_EMPTY: //!< GMessage, GInterrupt, and GRecord can be called with a zero timeout. If there wasn't data waiting in memory, this error is returned.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCLIB_NON_BLOCKING_READ_EMPTY_S);
-            break;
-        case G_TIMEOUT: //!< Operation timed out. Timeout is set by the --timeout option in GOpen() and can be overriden by GSetting().
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_TIMEOUT_S);
-            break;
-        case G_OPEN_ERROR: //!< Device could not be opened. E.G. Serial port or PCI device already open.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_OPEN_ERROR_S);
-            break;
-        case G_READ_ERROR: //!< Device read failed. E.G. Socket was closed by remote host. See @ref G_UTIL_GCAPS_KEEPALIVE.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_READ_ERROR_S);
-            break;
-        case G_WRITE_ERROR: //!< Device write failed. E.G. Socket was closed by remote host. See @ref G_UTIL_GCAPS_KEEPALIVE.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_WRITE_ERROR_S);
-            break;
-        case G_INVALID_PREPROCESSOR_OPTIONS: //!< GProgramDownload was called with a bad preprocessor directive.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_INVALID_PREPROCESSOR_OPTIONS_S);
-            break;
-        case G_COMMAND_CALLED_WITH_ILLEGAL_COMMAND: //!< GCommand() was called with an illegal command, e.g. ED, DL or QD.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_COMMAND_CALLED_WITH_ILLEGAL_COMMAND_S);
-            break;
-        case G_DATA_RECORD_ERROR: //!< Data record error, e.g. DR attempted on serial connection.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_DATA_RECORD_ERROR_S);
-            break;
-        case G_UNSUPPORTED_FUNCTION: //!< Function cannot be called on this bus. E.G. GInterrupt() on serial.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_UNSUPPORTED_FUNCTION_S);
-            break;
-        case G_FIRMWARE_LOAD_NOT_SUPPORTED: //!< Firmware is not supported on this bus, e.g. Ethernet for the DMC-21x3 series.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_FIRMWARE_LOAD_NOT_SUPPORTED_S);
-            break;
-        case G_ARRAY_NOT_DIMENSIONED: //!< Array operation was called on an array that was not in the controller's array table, see LA command.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_ARRAY_NOT_DIMENSIONED_S);
-            break;
-        case G_ILLEGAL_DATA_IN_PROGRAM: //!< Data to download not valid, e.g. \ in data.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_ILLEGAL_DATA_IN_PROGRAM_S);
-            break;
-        case G_UNABLE_TO_COMPRESS_PROGRAM_TO_FIT: //!< Program preprocessor could not compress the program within the user's constraints.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_UNABLE_TO_COMPRESS_PROGRAM_TO_FIT_S);
-            break;
-        case G_BAD_RESPONSE_QUESTION_MARK: //!< Operation received a ?, indicating controller has a TC error.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_RESPONSE_QUESTION_MARK_S);
-            break;
-        case G_BAD_VALUE_RANGE: //!< Bad value or range, e.g. GCon *g* variable passed to function was bad.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_VALUE_RANGE_S);
-            break;
-        case G_BAD_FULL_MEMORY: //!< Not enough memory for an operation, e.g. all connections allowed for a process already taken.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_FULL_MEMORY_S);
-            break;
-        case G_BAD_LOST_DATA: //!< Lost data, e.g. GCommand() response buffer was too small for the controller's response.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_LOST_DATA_S);
-            break;
-        case G_BAD_FILE: //!< Bad file path, bad file contents, or bad write.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_FILE_S);
-            break;
-        case G_BAD_ADDRESS: //!< Bad address
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_ADDRESS_S);
-            break;
-        case G_BAD_FIRMWARE_LOAD: //!< Bad firmware upgrade
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_BAD_FIRMWARE_LOAD_S);
-            break;
-        case G_GCAPS_OPEN_ERROR: //!< gcaps connection couldn't open. Server is not running or is not reachable.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCAPS_OPEN_ERROR_S);
-            break;
-        case G_GCAPS_SUBSCRIPTION_ERROR: //!< GMessage(), GRecord(), GInterrupt() called on a connection without --subscribe switch.
-            strcpy_s(buf, strlen(buf) * sizeof(char), G_GCAPS_SUBSCRIPTION_ERROR_S);
-            break;
+    case G_NO_ERROR: //!< Return value if function succeeded.
+        strcpy_s(buf, G_NO_ERROR_S);
+        break;
+    case G_GCLIB_ERROR: //!< General library error. Indicates internal API caught an unexpected error. Contact Galil support if this error is returned, softwaresupport@galil.com.
+        strcpy_s(buf, G_GCLIB_ERROR_S);
+        break;
+    case G_GCLIB_UTILITY_ERROR: //!< An invalid request value was specified to GUtility.
+        strcpy_s(buf, G_GCLIB_UTILITY_ERROR_S);
+        break;
+    case G_GCLIB_UTILITY_IP_TAKEN: //!< The IP cannot be assigned because ping returned a reply.
+        strcpy_s(buf, G_GCLIB_UTILITY_IP_TAKEN_S);
+        break;
+    case G_GCLIB_NON_BLOCKING_READ_EMPTY: //!< GMessage, GInterrupt, and GRecord can be called with a zero timeout. If there wasn't data waiting in memory, this error is returned.
+        strcpy_s(buf, G_GCLIB_NON_BLOCKING_READ_EMPTY_S);
+        break;
+    case G_TIMEOUT: //!< Operation timed out. Timeout is set by the --timeout option in GOpen() and can be overriden by GSetting().
+        strcpy_s(buf, G_TIMEOUT_S);
+        break;
+    case G_OPEN_ERROR: //!< Device could not be opened. E.G. Serial port or PCI device already open.
+        strcpy_s(buf, G_OPEN_ERROR_S);
+        break;
+    case G_READ_ERROR: //!< Device read failed. E.G. Socket was closed by remote host. See @ref G_UTIL_GCAPS_KEEPALIVE.
+        strcpy_s(buf, G_READ_ERROR_S);
+        break;
+    case G_WRITE_ERROR: //!< Device write failed. E.G. Socket was closed by remote host. See @ref G_UTIL_GCAPS_KEEPALIVE.
+        strcpy_s(buf, G_WRITE_ERROR_S);
+        break;
+    case G_INVALID_PREPROCESSOR_OPTIONS: //!< GProgramDownload was called with a bad preprocessor directive.
+        strcpy_s(buf, G_INVALID_PREPROCESSOR_OPTIONS_S);
+        break;
+    case G_COMMAND_CALLED_WITH_ILLEGAL_COMMAND: //!< GCommand() was called with an illegal command, e.g. ED, DL or QD.
+        strcpy_s(buf, G_COMMAND_CALLED_WITH_ILLEGAL_COMMAND_S);
+        break;
+    case G_DATA_RECORD_ERROR: //!< Data record error, e.g. DR attempted on serial connection.
+        strcpy_s(buf, G_DATA_RECORD_ERROR_S);
+        break;
+    case G_UNSUPPORTED_FUNCTION: //!< Function cannot be called on this bus. E.G. GInterrupt() on serial.
+        strcpy_s(buf, G_UNSUPPORTED_FUNCTION_S);
+        break;
+    case G_FIRMWARE_LOAD_NOT_SUPPORTED: //!< Firmware is not supported on this bus, e.g. Ethernet for the DMC-21x3 series.
+        strcpy_s(buf, G_FIRMWARE_LOAD_NOT_SUPPORTED_S);
+        break;
+    case G_ARRAY_NOT_DIMENSIONED: //!< Array operation was called on an array that was not in the controller's array table, see LA command.
+        strcpy_s(buf, G_ARRAY_NOT_DIMENSIONED_S);
+        break;
+    case G_ILLEGAL_DATA_IN_PROGRAM: //!< Data to download not valid, e.g. \ in data.
+        strcpy_s(buf, G_ILLEGAL_DATA_IN_PROGRAM_S);
+        break;
+    case G_UNABLE_TO_COMPRESS_PROGRAM_TO_FIT: //!< Program preprocessor could not compress the program within the user's constraints.
+        strcpy_s(buf, G_UNABLE_TO_COMPRESS_PROGRAM_TO_FIT_S);
+        break;
+    case G_BAD_RESPONSE_QUESTION_MARK: //!< Operation received a ?, indicating controller has a TC error.
+        strcpy_s(buf, G_BAD_RESPONSE_QUESTION_MARK_S);
+        break;
+    case G_BAD_VALUE_RANGE: //!< Bad value or range, e.g. GCon *g* variable passed to function was bad.
+        strcpy_s(buf, G_BAD_VALUE_RANGE_S);
+        break;
+    case G_BAD_FULL_MEMORY: //!< Not enough memory for an operation, e.g. all connections allowed for a process already taken.
+        strcpy_s(buf, G_BAD_FULL_MEMORY_S);
+        break;
+    case G_BAD_LOST_DATA: //!< Lost data, e.g. GCommand() response buffer was too small for the controller's response.
+        strcpy_s(buf, G_BAD_LOST_DATA_S);
+        break;
+    case G_BAD_FILE: //!< Bad file path, bad file contents, or bad write.
+        strcpy_s(buf, G_BAD_FILE_S);
+        break;
+    case G_BAD_ADDRESS: //!< Bad address
+        strcpy_s(buf, G_BAD_ADDRESS_S);
+        break;
+    case G_BAD_FIRMWARE_LOAD: //!< Bad firmware upgrade
+        strcpy_s(buf, G_BAD_FIRMWARE_LOAD_S);
+        break;
+    case G_GCAPS_OPEN_ERROR: //!< gcaps connection couldn't open. Server is not running or is not reachable.
+        strcpy_s(buf, G_GCAPS_OPEN_ERROR_S);
+        break;
+    case G_GCAPS_SUBSCRIPTION_ERROR: //!< GMessage(), GRecord(), GInterrupt() called on a connection without --subscribe switch.
+        strcpy_s(buf, G_GCAPS_SUBSCRIPTION_ERROR_S);
+        break;
     }
+    strcat_s(buf, "\n");
 }
 
 
-
-
 // Returns error value of an address connection, after initialising g with the open Galil
-GReturn connectAddress(EmbeddedFunctions *Functions, GCon &g) {
+GReturn connectAddress(EmbeddedFunctions* Functions, GCon& g) {
     cout << "Enter the exact address of Galil (Press Enter for Default 192.168.1.120): ";
     char ip[100];
     cin.get(ip, 100);
@@ -134,17 +137,20 @@ GReturn connectAddress(EmbeddedFunctions *Functions, GCon &g) {
         cout << "using " << ip << endl;
         return Functions->GOpen("192.168.1.120 -d", &g);
     }
-    
 }
 
 
 
 
+/*
+* ########################              GALIL FUNCTIONS            ###########################
+*/
 
 // Default constructor. Initialize variables, open Galil connection and allocate memory. NOT AUTOMARKED
 Galil::Galil() {
+    char error[1024] = { '0' };
     Functions = new EmbeddedFunctions;      // Pointer to EmbeddedFunctions, through which all Galil Function calls will be made
-    storeError(connectAddress(Functions, g), ReadBuffer);          // Connection handle for the Galil, passed through most Galil function calls
+    storeError(connectAddress(Functions, g), ReadBuffer);// Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
     for (int i = 0; i < 3; i++) {
         ControlParameters[i] = 0;           // Contains the controller gain values: K_p, K_i, K_d in that order 
     }
@@ -162,10 +168,8 @@ Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address) {
     char ip[100];
     strcpy_s(ip, address);
     strcat_s(ip, " -d");
-    Functions->GOpen(ip, &g);
-    // Connection handle for the Galil, passed through most Galil function calls
+    storeError(Functions->GOpen(ip, &g), ReadBuffer);// Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
 
-    strcpy_s(ReadBuffer, "");			    // Buffer to restore responses from the Galil
     for (int i = 0; i < 3; i++) {
         ControlParameters[i] = 0;           // Contains the controller gain values: K_p, K_i, K_d in that order 
     }
@@ -180,7 +184,7 @@ Galil::~Galil() {
     delete Functions;
     Functions = NULL;
     if (g)
-        GClose(g);
+        storeError(GClose(g), ReadBuffer);
 }
 
 
@@ -201,7 +205,7 @@ void Galil::DigitalOutput(uint16_t value) {
     DigOut2 >>= 8;
     sprintf_s(Command, "OP %d, %d;", DigOut1, DigOut2);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
 }
 
 
@@ -218,12 +222,12 @@ void Galil::DigitalByteOutput(bool bank, uint8_t value) {
     if (bank) {
         sprintf_s(Command, "OP , %d;", DigOut); // bank 1
         printf("%s\n", Command);
-        GCommand(g, Command, buf, sizeof(buf), 0);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
     }
     else {
         sprintf_s(Command, "OP %d;", DigOut); // bank 0
         printf("%s\n", Command);
-        GCommand(g, Command, buf, sizeof(buf), 0);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
     }
 }
 
@@ -235,80 +239,111 @@ void Galil::DigitalBitOutput(bool val, uint8_t bit) {
     char buf[1024];
     char Command[128] = "";
 
-    int DigOut = 1;
-    DigOut <<= bit;
-
-    if (val) {
-        sprintf_s(Command, "OP , %d;", DigOut); // bank 1
+    if (val == 1) {
+        sprintf_s(Command, "SB %d;", bit); // bank 1
         printf("%s\n", Command);
-        GCommand(g, Command, buf, sizeof(buf), 0);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
     }
     else {
-        sprintf_s(Command, "OP %d;", DigOut); // bank 0
+        sprintf_s(Command, "CB %d;", bit); // bank 1
         printf("%s\n", Command);
-        GCommand(g, Command, buf, sizeof(buf), 0);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
     }
 }
 
 // DIGITAL INPUTS
+
+// Return the 16 bits of input data
+// Query the digital inputs of the GALIL, See Galil command library @IN
+// Stores two errors in two lines in ReadBuffer.
 uint16_t Galil::DigitalInput() {
-    // Return the 16 bits of input data
-    // Query the digital inputs of the GALIL, See Galil command library @IN
+
 
     char buf[1024];
     char Command[128] = "";
+    char error[1024];
 
     uint16_t data = 0;
     sprintf_s(Command, "MG @IN[1];");
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+
+    strcpy_s(error, ReadBuffer);
+
     data = atoi(Command);
     data <<= 8;
     sprintf_s(Command, "MG @IN[0];");
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+
+    strcat_s(error, ReadBuffer);
+    strcpy_s(ReadBuffer, error);
+
     data &= atoi(Command);
-    printf("%d\n", int(data));
+    printf("Digital input: %d\n", int(data));
+
+
     return data;
 }
-                                        
-uint8_t Galil::DigitalByteInput(bool bank) {	// Read either high or low byte, as specified by user in 'bank'
+
+
+// Read either high or low byte, as specified by user in 'bank' // 0 = low, 1 = high
+uint8_t Galil::DigitalByteInput(bool bank) {
     uint8_t data = 0;
+    uint8_t set = 0;
     char buf[1024];
     char Command[128] = "";
 
+    if (bank) {
+        for (int i = 8; i < 16; i++) {
+            set = this->DigitalBitInput(i);
 
-    sprintf_s(Command, "MG @IN[%d];", bank);
-    printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
-    data = atoi(Command);
-    printf("Bank %d: %d\n", bank, int(data));
-    return data;           // 0 = low, 1 = high
-}
+            data |= (set << i - 8);
+        }
+    }
+    else {
+        for (int i = 0; i < 8; i++) {
+            set = this->DigitalBitInput(i);
+            data |= (set << i);
+        }
+    }
 
+    printf("Bank: %d: %d\n", bank, int(data));
 
-bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digital inputs. Above functions
-    char buf[1024];
-    char Command[128] = "";
-
-    uint16_t data = 0;
-    sprintf_s(Command, "MG @IN[1];");
-    printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
-    data = atoi(Command);
-    data <<= 8;
-    sprintf_s(Command, "MG @IN[0];");
-    printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
-    data &= atoi(Command);
-    printf("%d\n", int(data));
     return data;
 }
 
-bool Galil::CheckSuccessfulWrite() {	// Check the string response from the Galil to check that the last // command executed correctly. 1 = succesful. NOT AUTOMARKED
+
+bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digital inputs. Above functions may use this function
+    char buf[1024];
+    char Command[128] = "";
+
+    if (bit < 8) {
+        sprintf_s(Command, "MG @IN[%d];", bit);
+        printf("%s\n", Command);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+    }
+    else {
+        sprintf_s(Command, "MG @OUT[%d];", bit);
+        printf("%s\n", Command);
+        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+    }
 
 
-    return 0;
+    bool data = atoi(buf);
+
+    printf("Bit read: %d: %d\n", bit, data);
+    return data;
+}
+
+bool Galil::CheckSuccessfulWrite() {	// Check the string response from the Galil to check that the last command executed correctly. 1 = succesful. NOT AUTOMARKED
+    bool successful = 0;
+    if (strcmp(ReadBuffer, G_NO_ERROR_S) == 0) {
+        successful = 1;
+    }
+    printf("%s", ReadBuffer);
+
+    return successful;
 }
 
 
@@ -323,7 +358,7 @@ void Galil::WriteEncoder() {
     float AnaOut1 = 0;
     sprintf_s(Command, "AO 7, %0.2f;", AnaOut1);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
 }
 
 
@@ -332,17 +367,51 @@ float Galil::AnalogInput(uint8_t channel) {
     // Read Analog channel and return voltage			
     return 0;
 }
-void Galil::AnalogOutput(uint8_t channel, double voltage){		// Write to any channel of the Galil, send voltages as 
+void Galil::AnalogOutput(uint8_t channel, double voltage) {		// Write to any channel of the Galil, send voltages as 
 }
 
-                                                        // 2 decimal place in the command string
+// 2 decimal place in the command string
 void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {// Configure the range of the input channel with
 }
-                                                        // the desired range code
+// the desired range code
 
 
 
+/*
 
+    // We know the, low bytes of the Galil is connected to a DAC, then a DVM
+    // bit pattern --> DigitalOutput --> low byte LEDs --> DAC --> DVM
+    //                                                         --> AnalogInput --> voltage
+    // Use the equation of a line to find the relationship between bits & voltage: y = mx + b
+    // Input is inverted with output, so we want 0 bits --> 5V and 255 bits --> -5
+    // Digital range: 0 - 255 bits (1 byte)
+    // Analog range: -5V - 5V
+    // m = 5 - (-5) / (0 - 255) = - 10/255
+    // voltage = -(bit_pattern / 255.0 * 10) + 5;
+
+    // Send 0xAA to the DAC
+    sprintf_s(Command, "OP %d;", 0xAA); // 0b10101010 or 170
+    GCommand(g, Command, buf, sizeof(buf), 0);
+    Console::WriteLine("Bit pattern: 0xAA");
+
+    // Get the value from the DVM (on channel 0)
+    sprintf_s(Command, "MG @AN[%d];", 0);
+    GCommand(g, Command, buf, sizeof(buf), 0);
+    std::string s = buf; // convert buf to a string
+    float actualVoltage = atof(buf); // convert string to float
+
+    // Convert the value to the expected voltage
+    int value = 0xAA;
+    float expectedVoltage = -(value / 255.0 * 10) + 5;
+
+    // Print the results
+    // Also look at the Camera to see the voltage measured by the DVM (lower digital display)
+    Console::WriteLine("Actual Voltage: " + actualVoltage + "V");
+    Console::WriteLine("Expected Voltage: " + expectedVoltage + "V");
+
+
+
+*/
 
 
 
@@ -365,14 +434,21 @@ std::ostream& operator<<(std::ostream& output, Galil& galil) {
     string* Version;
     string* Info;
     char buf[1024];
+    char error[1024];
 
     // Checking Galil version 
     storeError(GVersion(buf, sizeof(buf)), galil.ReadBuffer);
     Version = new string(buf);
 
+    strcpy_s(error, galil.ReadBuffer);
+
     // Checking RIO Information
     storeError(GInfo(galil.g, buf, sizeof(buf)), galil.ReadBuffer);
     Info = new string(buf);
+
+    strcat_s(error, "\n");
+    strcat_s(error, galil.ReadBuffer);
+    strcpy_s(galil.ReadBuffer, error);
 
     return output << "info: " << Info->c_str() << endl << endl << "version: " << Version->c_str() << endl << endl;
 }
@@ -389,29 +465,48 @@ int main(void) {
 
 
     Galil asd;
+    asd.CheckSuccessfulWrite();
+    cout << asd;
+
     uint16_t value = 666;
     asd.DigitalOutput(value);
     Sleep(500);
-    asd.DigitalByteOutput(1, 44);
+
+    asd.DigitalByteOutput(1, 22);
     Sleep(500);
     asd.DigitalByteOutput(0, 103);
     Sleep(500);
-    asd.DigitalBitOutput(1, 7);
+
+    // blink 7
+    asd.DigitalBitOutput(0, 0);
+    Sleep(500);
+    asd.DigitalBitOutput(1, 0);
+    Sleep(500);
+    asd.DigitalBitOutput(0, 0);
+    Sleep(500);
+    asd.DigitalBitOutput(1, 0);
     Sleep(500);
 
+
+
+
+
+
+
+
+
     asd.DigitalInput();
-    Sleep(500);
+    printf("Bank 0 bytes: \n");
+    asd.DigitalByteInput(0);
+    printf("Bank 1 bytes: \n");
     asd.DigitalByteInput(1);
-    Sleep(500);
     asd.DigitalBitInput(1);
-    Sleep(500);
 
 
     asd.WriteEncoder();
-    Sleep(500);
 
 
-    cout << asd;
+
 
     return G_NO_ERROR;
 }
@@ -604,7 +699,7 @@ while (i < 15) {
 
 
     if (DigOut1 == 0b10000000) {
-        shiftR = 1;
+     j   shiftR = 1;
     }
     else if (DigOut1 == 1) {
         shiftR = 0;
