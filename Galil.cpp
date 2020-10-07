@@ -21,6 +21,23 @@
 
 
 
+
+# define K_P 0
+# define K_I 1
+# define K_D 2
+
+
+
+
+
+
+
+
+
+
+
+
+
 using namespace std;
 using namespace std::chrono_literals;
 
@@ -205,7 +222,7 @@ void Galil::DigitalOutput(uint16_t value) {
     DigOut2 >>= 8;
     sprintf_s(Command, "OP %d, %d;", DigOut1, DigOut2);
     printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
 }
 
 
@@ -222,12 +239,12 @@ void Galil::DigitalByteOutput(bool bank, uint8_t value) {
     if (bank) {
         sprintf_s(Command, "OP , %d;", DigOut); // bank 1
         printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     }
     else {
         sprintf_s(Command, "OP %d;", DigOut); // bank 0
         printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     }
 }
 
@@ -242,12 +259,12 @@ void Galil::DigitalBitOutput(bool val, uint8_t bit) {
     if (val == 1) {
         sprintf_s(Command, "SB %d;", bit); // bank 1
         printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     }
     else {
         sprintf_s(Command, "CB %d;", bit); // bank 1
         printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     }
 }
 
@@ -277,20 +294,17 @@ uint8_t Galil::DigitalByteInput(bool bank) {
     if (bank) {
         for (int i = 8; i < 16; i++) {
             set = this->DigitalBitInput(i);
-
             data |= (set << i - 8);
         }
     }
     else {
         for (int i = 0; i < 8; i++) {
             set = this->DigitalBitInput(i);
-
             data |= (set << i);
-            //printf("=%d|", data);
         }
     }
 
-    printf("Bank: %d: %d\n", bank, int(data));
+    printf("Bank: %d: %d\n", int(bank), data);
 
     return data;
 }
@@ -301,19 +315,17 @@ bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digit
     char Command[128] = "";
     bool data;
 
-    if (bit < 8) {
-        sprintf_s(Command, "MG @IN[%d];", bit);
-        //        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
-        data = atoi(buf);
-        data = 1 ^ data;
-    }
-    else {
-        sprintf_s(Command, "MG @OUT[%d];", bit);
-        //        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
-        data = atoi(buf);
-    }
+//    if (bit < 8) {
+    sprintf_s(Command, "MG @IN[%d];", bit);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    data = atoi(buf);
+    data = 1 ^ data;
+//    }
+//    else {
+//        sprintf_s(Command, "MG @OUT[%d];", bit);
+//        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+//        data = atoi(buf);
+//    }
 
     //    printf("|%d|", data);
 
@@ -333,31 +345,99 @@ bool Galil::CheckSuccessfulWrite() {	// Check the string response from the Galil
 
 
 
+
+
+// ANALOG FUNCTIONS
+// Read Analog channel and return voltage	
+float Galil::AnalogInput(uint8_t channel) {
+    char buf[1024];
+    char Command[128] = "";
+
+    sprintf_s(Command, "MG @AN[%d];", channel);
+    printf("%s\n", Command);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    return atoi(buf);
+}
+
+void Galil::AnalogOutput(uint8_t channel, double voltage) {		// Write to any channel of the Galil, send voltages as // 2 decimal place in the command string
+    char buf[1024];
+    char Command[128] = "";
+
+    sprintf_s(Command, "AO %d, %0.2f;", channel, voltage);
+    printf("%s\n", Command);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+}
+
+
+void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {// Configure the range of the input channel with // the desired range code
+    char buf[1024];
+    char Command[128] = "";
+
+    sprintf_s(Command, "DQ %d, %d;", channel, range);
+    printf("%s\n", Command);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+}
+
+
+
+
+
 // ENCODER / CONTROL FUNCTIONS
 // Manually Set the encoder value to zero
 void Galil::WriteEncoder() {
     char buf[1024];
     char Command[128] = "";
 
-    float AnaOut1 = 0;
-    sprintf_s(Command, "AO 7, %0.2f;", AnaOut1);
+    sprintf_s(Command, "WE 0, 0;");
     printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), 0), ReadBuffer);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
 }
 
 
-// ANALOG FUNCITONS
-float Galil::AnalogInput(uint8_t channel) {
-    // Read Analog channel and return voltage			
-    return 0;
+int Galil::ReadEncoder() {
+    // Read from Encoder
+
+    char buf[1024];
+    char Command[128] = "";
+
+    sprintf_s(Command, "QE 0;");
+    printf("%s\n", Command);
+    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+
+    return atoi(buf);
 }
-void Galil::AnalogOutput(uint8_t channel, double voltage) {		// Write to any channel of the Galil, send voltages as 
+// Set the desired setpoint for control loops, counts or counts/sec
+void Galil::setSetPoint(int s) {
+    this->setPoint = s;
+}	
+
+
+// double ControlParameters[3] contains the controller gain values: K_p, K_i, K_d in that order 
+// Set the proportional gain of the controller used in controlLoop()
+void Galil::setKp(double gain) {
+    this->ControlParameters[K_P] = gain;
 }
 
-// 2 decimal place in the command string
-void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {// Configure the range of the input channel with
-}
-// the desired range code
+// Set the integral gain of the controller used in controlLoop()
+void Galil::setKi(double gain) {
+    this->ControlParameters[K_I] = gain;
+}	
+
+// Set the derivative gain of the controller used in controlLoop()
+void Galil::setKd(double gain) {
+    this->ControlParameters[K_D] = gain;
+}	
+
+// Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
+// The loop will run using the PID values specified in the data of this object, and has an 
+// automatic timeout of 10s. You do not need to implement this function, it is defined in
+// GalilControl.lib. debug = 1 for debugging (it will print some values).
+void Galil::PositionControl(bool debug) {}	
+
+// same as above. Setpoint interpreted as counts per second
+void Galil::SpeedControl(bool debug) {}	
+
+
 
 
 
@@ -375,12 +455,12 @@ void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {// Configure the r
 
     // Send 0xAA to the DAC
     sprintf_s(Command, "OP %d;", 0xAA); // 0b10101010 or 170
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
     Console::WriteLine("Bit pattern: 0xAA");
 
     // Get the value from the DVM (on channel 0)
     sprintf_s(Command, "MG @AN[%d];", 0);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
     std::string s = buf; // convert buf to a string
     float actualVoltage = atof(buf); // convert string to float
 
@@ -557,16 +637,16 @@ int main()
     float AnaOut1 = 0;
     sprintf_s(Command, "AO 7,%f;", AnaOut1);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
 
     AnaOut1 = 1;
     sprintf_s(Command, "AO 7,%f;", AnaOut1);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
 
     sprintf_s(Command, "WE 0;");
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
 
     //int count;
     int q = 0;
@@ -582,7 +662,7 @@ int main()
 
         sprintf_s(Command, "QE %d;", q);
         // printf("%s\n", Command);
-        GCommand(g, Command, buf, sizeof(buf), 0);
+        GCommand(g, Command, buf, sizeof(buf), nullptr);
         Response = new string(buf);
         //count = stoi(*Response) / 4;
 
@@ -599,7 +679,7 @@ int main()
 
             sprintf_s(Command, "OP %d;", remainder);
             printf("%s\n", Command);
-            GCommand(g, Command, buf, sizeof(buf), 0);
+            GCommand(g, Command, buf, sizeof(buf), nullptr);
 
 
             auto end = std::chrono::high_resolution_clock::now();
@@ -623,7 +703,7 @@ int main()
     AnaOut1 = 0;
     sprintf_s(Command, "AO 7,%f;", AnaOut1);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
 
 
     if (g)
@@ -658,7 +738,7 @@ while (i < 15) {
 
     sprintf_s(Command, "OP %d;", DigOut1);
     printf("%s\n", Command);
-    GCommand(g, Command, buf, sizeof(buf), 0);
+    GCommand(g, Command, buf, sizeof(buf), nullptr);
 
     auto start = std::chrono::high_resolution_clock::now();
     std::this_thread::sleep_until(std::chrono::system_clock::now() + 0.5s);
