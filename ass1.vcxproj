@@ -150,7 +150,7 @@
     <ClInclude Include="header files\gclib_record.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Galil.cpp" />
+    <ClCompile Include="A1_8.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\GalilControl_debug.lib" />

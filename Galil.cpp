@@ -21,20 +21,9 @@
 
 
 
-
 # define K_P 0
 # define K_I 1
 # define K_D 2
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -165,7 +154,6 @@ GReturn connectAddress(EmbeddedFunctions* Functions, GCon& g) {
 
 // Default constructor. Initialize variables, open Galil connection and allocate memory. NOT AUTOMARKED
 Galil::Galil() {
-    char error[1024] = { '0' };
     Functions = new EmbeddedFunctions;      // Pointer to EmbeddedFunctions, through which all Galil Function calls will be made
     storeError(connectAddress(Functions, g), ReadBuffer);// Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
     for (int i = 0; i < 3; i++) {
@@ -173,10 +161,6 @@ Galil::Galil() {
     }
     setPoint = 0;					        // Control Setpoint
 }
-
-
-
-
 
 // Constructor with EmbeddedFunction initialization
 Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address) {
@@ -315,19 +299,20 @@ bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digit
     char Command[128] = "";
     bool data;
 
-//    if (bit < 8) {
+    //    if (bit < 8) {
     sprintf_s(Command, "MG @IN[%d];", bit);
     storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     data = atoi(buf);
     data = 1 ^ data;
-//    }
-//    else {
-//        sprintf_s(Command, "MG @OUT[%d];", bit);
-//        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
-//        data = atoi(buf);
-//    }
+    //    }
+    //    else {
+    //        sprintf_s(Command, "MG @OUT[%d];", bit);
+    //        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    //        data = atoi(buf);
+    //    }
 
-    //    printf("|%d|", data);
+    //cout << Command << endl;
+    //printf("|%d|", data);
 
     return data;
 }
@@ -353,13 +338,14 @@ float Galil::AnalogInput(uint8_t channel) {
     char buf[1024];
     char Command[128] = "";
 
-    sprintf_s(Command, "MG @AN[%d];", channel);
+    sprintf_s(Command, "MG @AO[%d];", channel);
     printf("%s\n", Command);
     storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
     return atoi(buf);
 }
 
-void Galil::AnalogOutput(uint8_t channel, double voltage) {		// Write to any channel of the Galil, send voltages as // 2 decimal place in the command string
+// Write to any channel of the Galil, send voltages as 2 decimal place in the command string
+void Galil::AnalogOutput(uint8_t channel, double voltage) {
     char buf[1024];
     char Command[128] = "";
 
@@ -367,9 +353,14 @@ void Galil::AnalogOutput(uint8_t channel, double voltage) {		// Write to any cha
     printf("%s\n", Command);
     storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
 }
-
-
-void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {// Configure the range of the input channel with // the desired range code
+/*
+Configure the range of the input channel with the desired range code
+1    0 to + 5  VDC
+2    0 to + 10 VDC
+3  - 5 to + 5  VDC
+4 - 10 to + 10 VDC Default
+*/
+void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {
     char buf[1024];
     char Command[128] = "";
 
@@ -401,7 +392,7 @@ int Galil::ReadEncoder() {
     char Command[128] = "";
 
     sprintf_s(Command, "QE 0;");
-    printf("%s\n", Command);
+    //    printf("%s\n", Command);
     storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
 
     return atoi(buf);
@@ -409,7 +400,7 @@ int Galil::ReadEncoder() {
 // Set the desired setpoint for control loops, counts or counts/sec
 void Galil::setSetPoint(int s) {
     this->setPoint = s;
-}	
+}
 
 
 // double ControlParameters[3] contains the controller gain values: K_p, K_i, K_d in that order 
@@ -421,21 +412,21 @@ void Galil::setKp(double gain) {
 // Set the integral gain of the controller used in controlLoop()
 void Galil::setKi(double gain) {
     this->ControlParameters[K_I] = gain;
-}	
+}
 
 // Set the derivative gain of the controller used in controlLoop()
 void Galil::setKd(double gain) {
     this->ControlParameters[K_D] = gain;
-}	
+}
 
 // Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
 // The loop will run using the PID values specified in the data of this object, and has an 
 // automatic timeout of 10s. You do not need to implement this function, it is defined in
 // GalilControl.lib. debug = 1 for debugging (it will print some values).
-void Galil::PositionControl(bool debug) {}	
+void Galil::PositionControl(bool debug) {}
 
 // same as above. Setpoint interpreted as counts per second
-void Galil::SpeedControl(bool debug) {}	
+void Galil::SpeedControl(bool debug) {}
 
 
 
@@ -523,11 +514,6 @@ std::ostream& operator<<(std::ostream& output, Galil& galil) {
 
 int main(void) {
 
-    /*    EmbeddedFunctions* f = new EmbeddedFunctions;
-    f->GOpen("192.168.1.120 -d", &g);
-    */
-
-
     Galil asd;
     asd.CheckSuccessfulWrite();
     cout << asd;
@@ -559,9 +545,75 @@ int main(void) {
     asd.DigitalBitInput(1);
 
 
+
+
+
+
+    asd.AnalogInputRange(7, 3);
+    //asd.AnalogInput(7);
+    printf("Def Analog output: %d\n", int(asd.AnalogInput(7)));
+    asd.AnalogOutput(7, 1);
+    printf("Analog output: %d\n", int(asd.AnalogInput(7)));
+    Sleep(1000);
+    asd.AnalogOutput(7, 2);
+    printf("Analog output: %d\n", int(asd.AnalogInput(7)));
+    Sleep(1000);
+    asd.AnalogOutput(7, 0);
+    Sleep(1000);
+
     asd.WriteEncoder();
+    asd.AnalogOutput(7, 3);
+
+    char buf[1024]; //traffic buffer
+    char Command[128] = "";
+    int new_response = 0;
+    int old_response = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    while (1) {
+        if (_kbhit()) {
+            break;
+        }
+
+        // reads encoder
+        new_response = asd.ReadEncoder();
+
+        if (old_response != new_response) {
 
 
+
+            cout << "quadrature count: " << new_response << endl;
+
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed = end - start;
+            std::cout << "Waited " << elapsed.count() << " ms\n";
+            /*
+            if (elapsed.count() >= 1000) {
+                break;
+            }
+            */
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            old_response = new_response;
+        }
+    }
+
+
+    asd.WriteEncoder();
+    asd.AnalogOutput(7, 0);
+    Sleep(1000);
+    new_response = asd.ReadEncoder();
+    cout << "quadrature count: " << new_response << endl;
+
+
+    asd.setSetPoint(10);
+    asd.setKd(0.7);
+    asd.setKi(0.7);
+    asd.setKp(1);
+
+    asd.PositionControl(1);
+    asd.SpeedControl(1);
 
 
     return G_NO_ERROR;

@@ -35,7 +35,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Galil.cpp">
+    <ClCompile Include="A1_8.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
