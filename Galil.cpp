@@ -32,15 +32,11 @@ using namespace std::chrono_literals;
 
 
 
-
-GCon g = 0;
-
-
 /*
 * #########################      HELPER FUNCTIONS      ##############################
 */
 
-// Stores error according to GReturn code and ReadBuffer from given command
+// Stores error according to GReturn code and buffer from given command
 void storeError(GReturn rc, char(&buf)[1024])
 {
 
@@ -146,6 +142,17 @@ GReturn connectAddress(EmbeddedFunctions* Functions, GCon& g) {
 }
 
 
+// Changes response code to default ":" for errors from GOpen, GClose and other non-exhaustive error-prone GFunctions
+void checkErrorSuccessful(char(&buf)[1024]) {
+    string success_error = string(buf);
+    success_error.pop_back();
+    if (strcmp(success_error.c_str(), G_NO_ERROR_S) == 0) {
+        strcpy_s(buf, ":");
+    }
+    else {
+        strcpy_s(buf, "error");
+    }
+}
 
 
 /*
@@ -155,7 +162,10 @@ GReturn connectAddress(EmbeddedFunctions* Functions, GCon& g) {
 // Default constructor. Initialize variables, open Galil connection and allocate memory. NOT AUTOMARKED
 Galil::Galil() {
     Functions = new EmbeddedFunctions;      // Pointer to EmbeddedFunctions, through which all Galil Function calls will be made
+
     storeError(connectAddress(Functions, g), ReadBuffer);// Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
+    checkErrorSuccessful(ReadBuffer);
+
     for (int i = 0; i < 3; i++) {
         ControlParameters[i] = 0;           // Contains the controller gain values: K_p, K_i, K_d in that order 
     }
@@ -169,7 +179,8 @@ Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address) {
     char ip[100];
     strcpy_s(ip, address);
     strcat_s(ip, " -d");
-    storeError(Functions->GOpen(ip, &g), ReadBuffer);// Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
+    storeError(Functions->GOpen(ip, &g), ReadBuffer); // Connection handle for the Galil, passed through most Galil function calls // Buffer to restore responses from the Galil
+    checkErrorSuccessful(ReadBuffer);
 
     for (int i = 0; i < 3; i++) {
         ControlParameters[i] = 0;           // Contains the controller gain values: K_p, K_i, K_d in that order 
@@ -184,8 +195,10 @@ Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address) {
 Galil::~Galil() {
     delete Functions;
     Functions = NULL;
-    if (g)
+    if (g) {
         storeError(GClose(g), ReadBuffer);
+        checkErrorSuccessful(ReadBuffer);
+    }
 }
 
 
@@ -196,7 +209,6 @@ Galil::~Galil() {
 // Write to all 16 bits of digital output, 1 command to the Galil
 // low byte is lowest bits 
 void Galil::DigitalOutput(uint16_t value) {
-    char buf[1024];
     char Command[128] = "";
 
     int DigOut1 = 0b1111'1111;
@@ -204,9 +216,9 @@ void Galil::DigitalOutput(uint16_t value) {
     DigOut1 &= value;
     DigOut2 &= value;
     DigOut2 >>= 8;
+
     sprintf_s(Command, "OP %d, %d;", DigOut1, DigOut2);
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
 }
 
 
@@ -215,20 +227,16 @@ void Galil::DigitalOutput(uint16_t value) {
 // Write to one byte, either high or low byte, as specified by user in 'bank'
 // 0 = low, 1 = high
 void Galil::DigitalByteOutput(bool bank, uint8_t value) {
-    char buf[1024];
     char Command[128] = "";
-
     int DigOut = int(value);
 
     if (bank) {
         sprintf_s(Command, "OP , %d;", DigOut); // bank 1
-        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+        GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
     }
     else {
         sprintf_s(Command, "OP %d;", DigOut); // bank 0
-        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+        GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
     }
 }
 
@@ -237,18 +245,15 @@ void Galil::DigitalByteOutput(bool bank, uint8_t value) {
 // bit is oon or off and bit = 0-15 (the banks) "set bit and clear bit" SB CB
 // Write single bit to digital outputs. 'bit' specifies which bit
 void Galil::DigitalBitOutput(bool val, uint8_t bit) {
-    char buf[1024];
     char Command[128] = "";
 
     if (val == 1) {
-        sprintf_s(Command, "SB %d;", bit); // bank 1
-        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+        sprintf_s(Command, "SB %d;", bit); // sets bit on
+        GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
     }
     else {
-        sprintf_s(Command, "CB %d;", bit); // bank 1
-        printf("%s\n", Command);
-        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+        sprintf_s(Command, "CB %d;", bit); // sets bit off
+        GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
     }
 }
 
@@ -262,8 +267,6 @@ uint16_t Galil::DigitalInput() {
 
     data |= this->DigitalByteInput(0);
     data |= (this->DigitalByteInput(1) << 8);
-    printf("Digital input: %d\n", data);
-
 
     return data;
 }
@@ -288,41 +291,28 @@ uint8_t Galil::DigitalByteInput(bool bank) {
         }
     }
 
-    printf("Bank: %d: %d\n", int(bank), data);
-
     return data;
 }
 
 
 bool Galil::DigitalBitInput(uint8_t bit) {	// Read single bit from current digital inputs. Above functions may use this function
-    char buf[1024];
     char Command[128] = "";
     bool data;
 
-    //    if (bit < 8) {
     sprintf_s(Command, "MG @IN[%d];", bit);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
-    data = atoi(buf);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+    data = atoi(ReadBuffer);
     data = 1 ^ data;
-    //    }
-    //    else {
-    //        sprintf_s(Command, "MG @OUT[%d];", bit);
-    //        storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
-    //        data = atoi(buf);
-    //    }
-
-    //cout << Command << endl;
-    //printf("|%d|", data);
 
     return data;
 }
 
 bool Galil::CheckSuccessfulWrite() {	// Check the string response from the Galil to check that the last command executed correctly. 1 = succesful. NOT AUTOMARKED
     bool successful = 0;
-    if (strcmp(ReadBuffer, G_NO_ERROR_S) == 0) {
+
+    if (string(ReadBuffer).back() == ':') {
         successful = 1;
     }
-    printf("%s", ReadBuffer);
 
     return successful;
 }
@@ -335,24 +325,21 @@ bool Galil::CheckSuccessfulWrite() {	// Check the string response from the Galil
 // ANALOG FUNCTIONS
 // Read Analog channel and return voltage	
 float Galil::AnalogInput(uint8_t channel) {
-    char buf[1024];
     char Command[128] = "";
 
-    sprintf_s(Command, "MG @AO[%d];", channel);
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
-    return atoi(buf);
+    sprintf_s(Command, "MG @AN[%d];", channel);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+    return atof(ReadBuffer);
 }
 
 // Write to any channel of the Galil, send voltages as 2 decimal place in the command string
 void Galil::AnalogOutput(uint8_t channel, double voltage) {
-    char buf[1024];
     char Command[128] = "";
 
     sprintf_s(Command, "AO %d, %0.2f;", channel, voltage);
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
 }
+
 /*
 Configure the range of the input channel with the desired range code
 1    0 to + 5  VDC
@@ -361,13 +348,14 @@ Configure the range of the input channel with the desired range code
 4 - 10 to + 10 VDC Default
 */
 void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {
-    char buf[1024];
     char Command[128] = "";
 
     sprintf_s(Command, "DQ %d, %d;", channel, range);
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
 }
+
+
+
 
 
 
@@ -376,108 +364,70 @@ void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {
 // ENCODER / CONTROL FUNCTIONS
 // Manually Set the encoder value to zero
 void Galil::WriteEncoder() {
-    char buf[1024];
     char Command[128] = "";
 
     sprintf_s(Command, "WE 0, 0;");
-    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
 }
 
-
+// Read from Encoder
 int Galil::ReadEncoder() {
-    // Read from Encoder
-
-    char buf[1024];
     char Command[128] = "";
 
     sprintf_s(Command, "QE 0;");
-    //    printf("%s\n", Command);
-    storeError(GCommand(g, Command, buf, sizeof(buf), nullptr), ReadBuffer);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
 
-    return atoi(buf);
+    return atoi(ReadBuffer);
 }
+
+
+
+
+
+
+
+
+
 // Set the desired setpoint for control loops, counts or counts/sec
 void Galil::setSetPoint(int s) {
+    char Command[128] = "";
+
+    sprintf_s(Command, "PS %d;", s);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+
     this->setPoint = s;
 }
-
 
 // double ControlParameters[3] contains the controller gain values: K_p, K_i, K_d in that order 
 // Set the proportional gain of the controller used in controlLoop()
 void Galil::setKp(double gain) {
+    char Command[128] = "";
+
+    sprintf_s(Command, "KP %f;", gain);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+
     this->ControlParameters[K_P] = gain;
 }
 
 // Set the integral gain of the controller used in controlLoop()
 void Galil::setKi(double gain) {
+    char Command[128] = "";
+
+    sprintf_s(Command, "KI %f;", gain);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+
     this->ControlParameters[K_I] = gain;
 }
 
 // Set the derivative gain of the controller used in controlLoop()
 void Galil::setKd(double gain) {
+    char Command[128] = "";
+
+    sprintf_s(Command, "KD %f;", gain);
+    GCommand(g, Command, ReadBuffer, sizeof(ReadBuffer), nullptr);
+
     this->ControlParameters[K_D] = gain;
 }
-
-// Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
-// The loop will run using the PID values specified in the data of this object, and has an 
-// automatic timeout of 10s. You do not need to implement this function, it is defined in
-// GalilControl.lib. debug = 1 for debugging (it will print some values).
-void Galil::PositionControl(bool debug) {}
-
-// same as above. Setpoint interpreted as counts per second
-void Galil::SpeedControl(bool debug) {}
-
-
-
-
-
-/*
-
-    // We know the, low bytes of the Galil is connected to a DAC, then a DVM
-    // bit pattern --> DigitalOutput --> low byte LEDs --> DAC --> DVM
-    //                                                         --> AnalogInput --> voltage
-    // Use the equation of a line to find the relationship between bits & voltage: y = mx + b
-    // Input is inverted with output, so we want 0 bits --> 5V and 255 bits --> -5
-    // Digital range: 0 - 255 bits (1 byte)
-    // Analog range: -5V - 5V
-    // m = 5 - (-5) / (0 - 255) = - 10/255
-    // voltage = -(bit_pattern / 255.0 * 10) + 5;
-
-    // Send 0xAA to the DAC
-    sprintf_s(Command, "OP %d;", 0xAA); // 0b10101010 or 170
-    GCommand(g, Command, buf, sizeof(buf), nullptr);
-    Console::WriteLine("Bit pattern: 0xAA");
-
-    // Get the value from the DVM (on channel 0)
-    sprintf_s(Command, "MG @AN[%d];", 0);
-    GCommand(g, Command, buf, sizeof(buf), nullptr);
-    std::string s = buf; // convert buf to a string
-    float actualVoltage = atof(buf); // convert string to float
-
-    // Convert the value to the expected voltage
-    int value = 0xAA;
-    float expectedVoltage = -(value / 255.0 * 10) + 5;
-
-    // Print the results
-    // Also look at the Camera to see the voltage measured by the DVM (lower digital display)
-    Console::WriteLine("Actual Voltage: " + actualVoltage + "V");
-    Console::WriteLine("Expected Voltage: " + expectedVoltage + "V");
-
-
-
-*/
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -485,26 +435,26 @@ void Galil::SpeedControl(bool debug) {}
 
 // Operator overload for '<<' operator. So the user can say cout << Galil; This function should print out the
 // output of GInfo and GVersion, with two newLines after each.
-std::ostream& operator<<(std::ostream& output, Galil& galil) {
+std::ostream& (operator<<(std::ostream& output, Galil& galil)) {
     string* Version;
     string* Info;
-    char buf[1024];
-    char error[1024];
+    char Error1[1024] = "";
+    char Error2[1024] = "";
 
     // Checking Galil version 
-    storeError(GVersion(buf, sizeof(buf)), galil.ReadBuffer);
-    Version = new string(buf);
-
-    strcpy_s(error, galil.ReadBuffer);
+    storeError(GVersion(galil.ReadBuffer, sizeof(galil.ReadBuffer)), Error1);
+    Version = new string(galil.ReadBuffer);
 
     // Checking RIO Information
-    storeError(GInfo(galil.g, buf, sizeof(buf)), galil.ReadBuffer);
-    Info = new string(buf);
+    storeError(GInfo(galil.g, galil.ReadBuffer, sizeof(galil.ReadBuffer)), Error2);
+    Info = new string(galil.ReadBuffer);
 
-    strcat_s(error, "\n");
-    strcat_s(error, galil.ReadBuffer);
-    strcpy_s(galil.ReadBuffer, error);
+    checkErrorSuccessful(Error1);
+    checkErrorSuccessful(Error2);
 
+    if ((strcmp(Error1, ":") == 0) && (strcmp(Error2, ":") == 0)) {
+        strcpy_s(galil.ReadBuffer, ":");
+    }
     return output << "info: " << Info->c_str() << endl << endl << "version: " << Version->c_str() << endl << endl;
 }
 
@@ -517,94 +467,49 @@ int main(void) {
     Galil asd;
     asd.CheckSuccessfulWrite();
     cout << asd;
+    asd.CheckSuccessfulWrite();
 
     uint16_t value = 666;
     asd.DigitalOutput(value);
+    asd.CheckSuccessfulWrite();
 
     asd.DigitalByteOutput(1, 22);
     asd.DigitalByteOutput(0, 103);
+    asd.CheckSuccessfulWrite();
 
     // blink 7
     asd.DigitalBitOutput(0, 0);
     asd.DigitalBitOutput(1, 0);
     asd.DigitalBitOutput(0, 0);
     asd.DigitalBitOutput(1, 0);
-
+    asd.CheckSuccessfulWrite();
 
 
 
 
     value = 666;
     asd.DigitalOutput(value); // 154, 2
-
+    asd.CheckSuccessfulWrite();
 
 
     asd.DigitalInput();
     asd.DigitalByteInput(0);
     asd.DigitalByteInput(1);
     asd.DigitalBitInput(1);
+    asd.CheckSuccessfulWrite();
 
 
 
 
-
+    asd.WriteEncoder();
 
     asd.AnalogInputRange(7, 3);
-    //asd.AnalogInput(7);
-    printf("Def Analog output: %d\n", int(asd.AnalogInput(7)));
     asd.AnalogOutput(7, 1);
-    printf("Analog output: %d\n", int(asd.AnalogInput(7)));
     Sleep(1000);
     asd.AnalogOutput(7, 2);
-    printf("Analog output: %d\n", int(asd.AnalogInput(7)));
     Sleep(1000);
     asd.AnalogOutput(7, 0);
-    Sleep(1000);
-
-    asd.WriteEncoder();
-    asd.AnalogOutput(7, 3);
-
-    char buf[1024]; //traffic buffer
-    char Command[128] = "";
-    int new_response = 0;
-    int old_response = 0;
-    auto start = std::chrono::high_resolution_clock::now();
-    while (1) {
-        if (_kbhit()) {
-            break;
-        }
-
-        // reads encoder
-        new_response = asd.ReadEncoder();
-
-        if (old_response != new_response) {
-
-
-
-            cout << "quadrature count: " << new_response << endl;
-
-
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double, std::milli> elapsed = end - start;
-            std::cout << "Waited " << elapsed.count() << " ms\n";
-            /*
-            if (elapsed.count() >= 1000) {
-                break;
-            }
-            */
-
-            auto start = std::chrono::high_resolution_clock::now();
-
-            old_response = new_response;
-        }
-    }
-
-
-    asd.WriteEncoder();
-    asd.AnalogOutput(7, 0);
-    Sleep(1000);
-    new_response = asd.ReadEncoder();
-    cout << "quadrature count: " << new_response << endl;
+    Sleep(2000);
 
 
     asd.setSetPoint(10);
@@ -612,8 +517,108 @@ int main(void) {
     asd.setKi(0.7);
     asd.setKp(1);
 
+
+
+    // Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
+    // The loop will run using the PID values specified in the data of this object, and has an 
+    // automatic timeout of 10s. You do not need to implement this function, it is defined in
+    // GalilControl.lib. debug = 1 for debugging (it will print some values).
+    cout << "Position Control" << endl;
     asd.PositionControl(1);
+    Sleep(1000);
+
+    // same as above. Setpoint interpreted as counts per second
+    cout << "Speed Control" << endl;
     asd.SpeedControl(1);
+    Sleep(1000);
+
+
+
+    asd.WriteEncoder();
+    asd.AnalogOutput(7, 3);
+
+
+    /*
+        int new_response = 0;
+        int old_response = 0;
+        auto start = std::chrono::high_resolution_clock::now();
+        while (1) {
+            if (_kbhit()) {
+                break;
+            }
+
+            // reads encoder
+            new_response = asd.ReadEncoder();
+
+            if (old_response != new_response) {
+
+
+
+                cout << "quadrature count: " << new_response << endl;
+
+
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double, std::milli> elapsed = end - start;
+                std::cout << "Waited " << elapsed.count() << " ms\n";
+
+                auto start = std::chrono::high_resolution_clock::now();
+
+                old_response = new_response;
+            }
+        }
+
+        asd.WriteEncoder();
+        asd.AnalogOutput(7, 0);
+        new_response = asd.ReadEncoder();
+        cout << "quadrature count: " << new_response << endl;
+    */
+
+
+
+
+
+
+
+
+
+
+    /*
+
+        // We know the, low bytes of the Galil is connected to a DAC, then a DVM
+        // bit pattern --> DigitalOutput --> low byte LEDs --> DAC --> DVM
+        //                                                         --> AnalogInput --> voltage
+        // Use the equation of a line to find the relationship between bits & voltage: y = mx + b
+        // Input is inverted with output, so we want 0 bits --> 5V and 255 bits --> -5
+        // Digital range: 0 - 255 bits (1 byte)
+        // Analog range: -5V - 5V
+        // m = 5 - (-5) / (0 - 255) = - 10/255
+        // voltage = -(bit_pattern / 255.0 * 10) + 5;
+
+        // Send 0xAA to the DAC
+        sprintf_s(Command, "OP %d;", 0xAA); // 0b10101010 or 170
+        GCommand(g, Command, buf, sizeof(buf), nullptr);
+        Console::WriteLine("Bit pattern: 0xAA");
+
+        // Get the value from the DVM (on channel 0)
+        sprintf_s(Command, "MG @AN[%d];", 0);
+        GCommand(g, Command, buf, sizeof(buf), nullptr);
+        std::string s = buf; // convert buf to a string
+        float actualVoltage = atof(buf); // convert string to float
+
+        // Convert the value to the expected voltage
+        int value = 0xAA;
+        float expectedVoltage = -(value / 255.0 * 10) + 5;
+
+        // Print the results
+        // Also look at the Camera to see the voltage measured by the DVM (lower digital display)
+        Console::WriteLine("Actual Voltage: " + actualVoltage + "V");
+        Console::WriteLine("Expected Voltage: " + expectedVoltage + "V");
+
+
+
+    */
+
+    asd.AnalogOutput(7, 0);
 
 
     return G_NO_ERROR;
