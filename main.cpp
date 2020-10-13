@@ -35,7 +35,35 @@ using namespace std::chrono_literals;
 
 int main(void) {
 
+    /*
+
+
+1. Write the value 45508 (0xB1C4) to the digital outputs
+
+2. Write the value 113 (0x71) to the digital high byte
+
+3. Write the value 1 to the 1st bit of digital output
+
+4. Write the value 0 to the 13th bit of digital output
+
+5. Read and print out the value of the 3rd bit of digital inputs
+
+    */
     Galil asd;
+    asd.DigitalOutput(0xB1C4);
+    Sleep(1000);
+    asd.DigitalByteOutput(1, 0x71);
+    Sleep(1000);
+    asd.DigitalBitOutput(1, 0);
+    Sleep(1000);
+    asd.DigitalBitOutput(0, 12);
+    Sleep(1000);
+    cout << int(asd.DigitalBitInput(2)) << endl;
+
+
+    /*
+    *
+    *
     asd.CheckSuccessfulWrite();
     cout << asd;
     asd.CheckSuccessfulWrite();
@@ -97,7 +125,7 @@ int main(void) {
 
 
     // Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
-    // The loop will run using the PID values specified in the data of this object, and has an 
+    // The loop will run using the PID values specified in the data of this object, and has an
     // automatic timeout of 10s. You do not need to implement this function, it is defined in
     // GalilControl.lib. debug = 1 for debugging (it will print some values).
     cout << "Position Control" << endl;
@@ -114,6 +142,7 @@ int main(void) {
     asd.WriteEncoder();
     asd.AnalogOutput(7, 3);
 
+    */
 
     /*
         int new_response = 0;
