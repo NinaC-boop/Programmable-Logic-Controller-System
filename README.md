@@ -1,0 +1,3 @@
+# Programmable-Logic-Controller-System
+
+I have individually completed the setup of a PLC (Programmable Logic Control) system for a lawn mower using C++. The tools I received were the following: I was given just 3 manuals - an Engineering Diagram of the PLC set up, a User Manual for the same PLC and the Firmware Command Reference. The PLC set up was remotely run due to COVID, which forced each student to a 1-hour timeslot per week, and shared use during non-university hours. Other than that, a skeleton of approximately 15 functions to control digital, analogue, encoder and other helper functions were needed.
