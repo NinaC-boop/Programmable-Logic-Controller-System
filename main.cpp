@@ -36,17 +36,17 @@ using namespace std::chrono_literals;
 int main(void) {
 
     /*
+    Just a temporary file I used during testing day
 
+    1. Write the value 45508 (0xB1C4) to the digital outputs
 
-1. Write the value 45508 (0xB1C4) to the digital outputs
+    2. Write the value 113 (0x71) to the digital high byte
 
-2. Write the value 113 (0x71) to the digital high byte
+    3. Write the value 1 to the 1st bit of digital output
 
-3. Write the value 1 to the 1st bit of digital output
+    4. Write the value 0 to the 13th bit of digital output
 
-4. Write the value 0 to the 13th bit of digital output
-
-5. Read and print out the value of the 3rd bit of digital inputs
+    5. Read and print out the value of the 3rd bit of digital inputs
 
     */
     Galil asd;
